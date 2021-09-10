@@ -64,7 +64,7 @@ int main()
 	int ddepth = -1;
 	cv::Mat kernel;
 	kernel = cv::Mat::ones(3, 3, CV_32F) / (float)(3 * 3);
-	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test18.jpg", cv::IMREAD_COLOR);
+	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test6.jpg", cv::IMREAD_COLOR);
 	cv::Mat src_gray, src_bin, src_fil, src_sh;
 	cv::cvtColor(img, src_gray, cv::COLOR_BGR2GRAY);
 	src_fil = filtred(src_gray);
@@ -89,21 +89,23 @@ int main()
 	Sobel(src_gray, grad_y, ddepth, 0, 1, -1, scale, delta=0, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_y, abs_grad_y);
 	cv::subtract(grad_x, grad_y, grad);
+	//grad = 0.5 * grad_x + 0.5 * grad_y;
 	cv::convertScaleAbs(grad, grad);
 	cv::threshold(grad, grad, 200, 255, cv::THRESH_OTSU);
 	print(grad_y, "grad_y");
 	print( grad_x,"grad_x");
 	print(grad, "grad");
 	cv::Mat blured, blured_bin;
-	cv::GaussianBlur(grad, blured, cv::Size(3, 3), 0, 0, cv::BORDER_DEFAULT);
+	cv::GaussianBlur(grad, blured, cv::Size(9, 9), 0, 0, cv::BORDER_DEFAULT);
 	//cv::blur(grad, blured, cv::Size_<int>(9, 9));
 	//blured = grad;
 	print(blured, "blur");
 	
 	cv::threshold(blured, blured_bin, 200, 255, cv::THRESH_OTSU);
-	int size_x = (img.cols / 600) * 5;
+	int size_x = (img.cols / 600) * 3;
 	int size_y= (img.rows / 450) * 4;
-	cv::dilate(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
+	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
+	cv::dilate(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 2);
 	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
 	cv::dilate(blured_bin, blured_bin, cv::Mat::ones(1, size_x, CV_32F), cv::Point(-1, -1), 3);
 	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, size_x, CV_32F),cv::Point(-1,-1),3);
@@ -118,7 +120,7 @@ int main()
 	//cv::Canny(blured_bin, blured_bin, 50, 200);
 	std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hireachy;
-	cv::findContours(blured_bin, contours, hireachy,cv::RETR_EXTERNAL,cv::CHAIN_APPROX_SIMPLE, cv::Point());
+	cv::findContours(blured_bin, contours, hireachy,cv::RETR_CCOMP,cv::CHAIN_APPROX_TC89_KCOS, cv::Point());
 	cv::Mat drawing = cv::Mat::zeros(blured_bin.size(), CV_8UC3);
 	int ncomp = contours.size();
 	
@@ -126,7 +128,7 @@ int main()
 	
 	/*for (int i = 0; i < ncomp; i++)
 	{
-		cv::drawContours(img, contours, (int)i, cv::Scalar(rng(255), rng(255), rng(255)),-1);
+		cv::drawContours(img, contours, (int)i, cv::Scalar(rng(255), rng(255), rng(255)),3);
 	}*/
 	print(blured_bin, "blured_bin");
 	for (auto cont : contours)
@@ -152,7 +154,7 @@ int main()
 		{	
 			
 			if (rect_points[i].x < (double)blured_bin.cols && rect_points[i].y < (double)blured_bin.rows && rect_points[i].x >=0. && rect_points[i].y >= 0.)
-				if (area > 0.5)
+				if (area > 0.7)
 				{
 					++cond;
 					std::cout << "area: " << area << std::endl;
@@ -166,7 +168,9 @@ int main()
 			cond = 4;
 		std::cout << "col"<< blured_bin.cols << " " << blured_bin.rows << std::endl;
 	}
-	
+		 
+	/*minRect = minAreaRect(contours[ncomp]);
+	minRect.points(rect_points);*/
 		for (int j = 0; j < 4; j++)
 		{
 			line(img, rect_points[j], rect_points[(j + 1) % 4], color,3);
