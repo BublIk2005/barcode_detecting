@@ -1,4 +1,0 @@
-E:/Projects/barcode_detecting/build/CMakeFiles/ALL_BUILD.dir
-E:/Projects/barcode_detecting/build/CMakeFiles/ZERO_CHECK.dir
-E:/Projects/barcode_detecting/build/lib/CMakeFiles/barcode_detecting.dir
-E:/Projects/barcode_detecting/build/lib/CMakeFiles/ALL_BUILD.dir

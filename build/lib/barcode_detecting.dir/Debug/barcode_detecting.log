@@ -1,3 +1,0 @@
-﻿  barcode_detecting.cpp
-E:\Projects\barcode_detecting\lib\barcode_detecting.cpp(125,29): warning C4267: инициализация: преобразование из "size_t" в "int"; возможна потеря данных
-  barcode_detecting.vcxproj -> E:\Projects\barcode_detecting\bin.dbg\barcode_detecting.exe
