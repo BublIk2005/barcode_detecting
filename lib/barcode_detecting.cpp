@@ -3,7 +3,8 @@
 #include <cstdlib>
 #include<math.h>
 #include<utility>
-
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
 void print(cv::Mat src, std::string window_name)
 {
@@ -54,6 +55,8 @@ cv::Mat scalePyr(cv::Mat &src)
 	return res;
 }
 
+
+
 std::vector<std::vector<cv::Point>>  sortContours(std::vector<std::vector<cv::Point>> & contours)
 {
 	for (size_t i = 0; i < contours.size() - 1; i++) {
@@ -78,10 +81,10 @@ double lineLenght(cv::Point2f a, cv::Point2f b)
 
 cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)
 {
-	cv::Point2f vec = a - b;
-	cv::Point2f dir(img.cols, 0);
+	cv::Point2f vec = b - a;
+	cv::Point2f dir(0, img.rows);
 	float cos = (vec.x * dir.x + vec.y * dir.y) / (sqrt(vec.x * vec.x + vec.y * vec.y) * sqrt(dir.x * dir.x + dir.y * dir.y));
-	float angle = 57.3*acosf(cos)-3;
+	float angle = -57.3*acosf(cos);
 	std::cout <<"cos: "<<cos<<" angle: "<< angle << std::endl;
 	cv::Point2f center((img.cols - 1) / 2.0, (img.rows - 1) / 2.0);
 	cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
@@ -91,8 +94,70 @@ cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)
 
 	cv::Mat result;
 	cv::warpAffine(img, result, rot, bbox.size());
+	
+	
+	
 	return result;
 }
+
+cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_points)
+{
+	cv::Point2f vec = b - a;
+	cv::Point2f dir(0, img.rows);
+	float cos = (vec.x * dir.x + vec.y * dir.y) / (sqrt(vec.x * vec.x + vec.y * vec.y) * sqrt(dir.x * dir.x + dir.y * dir.y));
+	float sin = (vec.x * dir.y - vec.y * dir.x) / (sqrt(vec.x * vec.x + vec.y * vec.y) * sqrt(dir.x * dir.x + dir.y * dir.y));
+	float angle = 57.3 *  acosf(cos);
+	if (sin < 0 && cos < 0 || cos>0 && sin > 0)
+		angle = -angle;
+	std::cout << "cos: " << cos << "sin: " << sin << " angle: " << angle << std::endl;
+	cv::Point2f center((img.cols - 1) / 2.0, (img.rows - 1) / 2.0);
+	cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
+	cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), angle).boundingRect2f();
+	rot.at<double>(0, 2) += bbox.width / 2.0 - img.cols / 2.0;
+	rot.at<double>(1, 2) += bbox.height / 2.0 - img.rows / 2.0;
+
+	cv::Mat result;
+	cv::warpAffine(img, result, rot, bbox.size());
+	cv::Point2f newPoint;
+	for (int i = 0; i < 4; ++i) {
+		newPoint.x = (rect_points[i].x-center.x)*cos - (rect_points[i].y-center.y)*sin + center.x * (result.cols / (float)img.cols);
+		newPoint.y = (rect_points[i].x - center.x) * sin + (rect_points[i].y - center.y) * cos+center.y * (result.rows / (float)img.rows);
+		//newPoint = newPoint * (result.cols / (float)img.cols);
+		rect_points[i] = newPoint;
+	}
+
+
+	return result;
+}
+cv::Mat Rotation(cv::Mat img, cv::RotatedRect rect, cv::Point2f* rect_points)
+{
+	float angle = rect.angle;
+	if (abs(angle) > 45.)
+		angle += 90;
+	//cv::Point2f center = rect.center;
+	cv::Point2f center((img.cols - 1) / 2.0, (img.rows - 1) / 2.0);
+	cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
+	cv::Rect2f bbox = cv::RotatedRect(cv::Point2f(), img.size(), angle).boundingRect2f();
+	rot.at<double>(0, 2) += bbox.width / 2.0 - img.cols / 2.0;
+	rot.at<double>(1, 2) += bbox.height / 2.0 - img.rows / 2.0;
+	float cosin = cos(angle);
+	float sinus = sin(angle);
+	std::cout << "cos: " << cosin << " angle: " << angle << std::endl;
+	cv::Mat result;
+	cv::warpAffine(img, result, rot, bbox.size());
+	cv::Point2f newCenter(bbox.width/2., bbox.height / 2.0);
+	cv::Point2f newPoint;
+	for (int i = 0; i < 4; ++i) {
+		newPoint.x = (rect_points[i].x - center.x) * cosin - (rect_points[i].y - center.y) * sqrt(1 - cosin * cosin) + center.x * (result.cols / (float)img.cols);
+		newPoint.y = (rect_points[i].x - center.x) * sqrt(1 - cosin * cosin) + (rect_points[i].y - center.y) * cosin + center.y * (result.rows / (float)img.rows);
+		//newPoint = newPoint * (result.cols / (float)img.cols);
+		rect_points[i] = newPoint;
+	}
+
+
+	return result;
+}
+
 
 std::vector<cv::Mat> Gradients(cv::Mat src_gray)
 {
@@ -102,10 +167,10 @@ std::vector<cv::Mat> Gradients(cv::Mat src_gray)
 	int scale = 1;
 	int ddepth = CV_32F;
 	int delta;
-	Sobel(src_gray, grad_x, ddepth, 1, 0, -1, scale, delta = 0, cv::BORDER_DEFAULT);
+	Sobel(src_gray, grad_x, ddepth, 1, 0, 3, scale, delta = 0, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_x, abs_grad_x);
 
-	Sobel(src_gray, grad_y, ddepth, 0, 1, -1, scale, delta = 0, cv::BORDER_DEFAULT);
+	Sobel(src_gray, grad_y, ddepth, 0, 1, 3, scale, delta = 0, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_y, abs_grad_y);
 	cv::subtract(grad_x, grad_y, gradX);
 	cv::convertScaleAbs(gradX, gradX);
@@ -171,6 +236,31 @@ cv::Mat findBarcode(cv::Mat src)
 	return src;
 }
 
+cv::Mat skelet(cv::Mat img)
+{
+	cv::threshold(img, img, 127, 255, cv::THRESH_BINARY);
+	cv::Mat skel(img.size(), CV_8UC1, cv::Scalar(0));
+	cv::Mat temp;
+	cv::Mat eroded;
+
+	cv::Mat element = cv::getStructuringElement(cv::MORPH_CROSS, cv::Size(3, 3));
+
+	bool done;
+	do
+	{
+		cv::erode(img, eroded, element);
+		cv::dilate(eroded, temp, element); // temp = open(img)
+		cv::subtract(img, temp, temp);
+		cv::bitwise_or(skel, temp, skel);
+		eroded.copyTo(img);
+		done = (cv::countNonZero(img) == 0);
+	} while (!done);
+	return skel;
+}
+cv::Vec4i findCentralLine(std::vector< cv::Vec4i> lines)
+{
+	return 0;
+}
 
 
 int main()
@@ -181,7 +271,7 @@ int main()
 	cv::Mat kernel;
 	kernel = cv::Mat::ones(3, 3, CV_32F) / (float)(3 * 3);
 
-	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test1.jpg", cv::IMREAD_COLOR);
+	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test7.jpg", cv::IMREAD_COLOR);
 	cv::Mat src_gray, src_bin, src_fil, src_sh;
 	cv::cvtColor(img, src_gray, cv::COLOR_BGR2GRAY);
 	src_fil = filtred(src_gray);
@@ -203,41 +293,49 @@ int main()
 	cv::Mat abs_grad_x, abs_grad_y;
 	int scale =1;
 	//ddepth = CV_32F;
-	Sobel(src_gray, grad_x, ddepth, 1, 0, -1, scale, delta=0, cv::BORDER_DEFAULT);
+	cv::Mat kernel_grad, blured_grad;
+	kernel_grad = cv::Mat::ones(3, 3, CV_32F);
+	Sobel(src_gray, grad_x, ddepth, 1, 0, 3, scale, delta=1, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_x, abs_grad_x);
-
-
-	Sobel(src_gray, grad_y, ddepth, 0, 1, -1, scale, delta=0, cv::BORDER_DEFAULT);
+	
+	Sobel(src_gray, grad_y, ddepth, 0, 1, 3, scale, delta=1, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_y, abs_grad_y);
-	cv::subtract(grad_x, grad_y, grad);
+	
+	cv::subtract(abs_grad_x, abs_grad_y, grad);
 	//grad = grad_x*0.5 +  grad_y*0.5;
 	cv::convertScaleAbs(grad, grad);
-	cv::threshold(grad, grad, 200, 255, cv::THRESH_OTSU);
-	print(grad_y, "grad_y");
-	print( grad_x,"grad_x");
+	
+	print(abs_grad_y, "grad_y");
+	print(abs_grad_x, "grad_x");
 	print(grad, "grad");
+	
+	cv::threshold(grad, grad, 200, 255, cv::THRESH_OTSU);
+	cv::erode(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
+	cv::dilate(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 2);
+	cv::erode(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
+	cv::GaussianBlur(grad, grad, cv::Size(9, 9), 1, 0, cv::BORDER_DEFAULT);
+	cv::filter2D(grad, blured_grad, CV_8UC1, kernel_grad);
+	//print(blured_grad, "blured_grad");
+	//blured_grad = grad;
 	cv::Mat blured, blured_bin;
-	cv::GaussianBlur(grad, blured, cv::Size(9, 9), 0, 0, cv::BORDER_DEFAULT);
+	//cv::GaussianBlur(blured_grad, blured, cv::Size(5, 5), 1, 0, cv::BORDER_DEFAULT);
 	//cv::blur(grad, blured, cv::Size_<int>(9, 9));
-	//blured = grad;
+	blured = blured_grad;
 	//print(blured, "blur");
 	
-	cv::threshold(blured, blured_bin, 200, 255, cv::THRESH_OTSU);
-	int size_x = (img.cols / 600) * 3;
-	int size_y= (img.rows / 450) * 4;
-	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
+	cv::threshold(blured, blured_bin, 100, 255, cv::THRESH_OTSU);
+	//blured_bin = blured_grad;
+	/*cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
 	cv::dilate(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 2);
-	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
-	/*cv::dilate(blured_bin, blured_bin, cv::Mat::ones(1, size_x, CV_32F), cv::Point(-1, -1), 3);
-	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, size_x, CV_32F),cv::Point(-1,-1),3);
-	cv::dilate(blured_bin, blured_bin, cv::Mat::ones(size_x/3, size_x/3, CV_32F), cv::Point(-1, -1), 2);
-	cv::erode(blured_bin, blured_bin, cv::Mat::ones(size_x/3, size_x/3, CV_32F), cv::Point(-1, -1), 2);*/
-	
-	//print(blured_bin, "erodil");
+	cv::erode(blured_bin, blured_bin, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);*/
 
-	kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size_<int>(img.cols/100, 1));
+	
+	/*print(blured_bin, "erodil");*/
+
+	kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size_<int>(img.cols/100, 2));
 	cv::morphologyEx(blured_bin, blured_bin, cv::MORPH_CLOSE, kernel);
-	//print(blured_bin, "blured_bin");
+	
+	print(blured_bin, "blured_bin");
 	//cv::Canny(blured_bin, blured_bin, 50, 200);
 	std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hireachy;
@@ -247,10 +345,7 @@ int main()
 	
 	contours=sortContours(contours);
 	
-	/*for (int i = 0; i < ncomp; i++)
-	{
-		cv::drawContours(img, contours, (int)i, cv::Scalar(rng(255), rng(255), rng(255)),3);
-	}*/
+	
 	
 	//print(blured_bin, "blured_bin");
 	/*for (auto cont : contours)
@@ -276,7 +371,7 @@ int main()
 		{	
 			
 			if (rect_points[i].x < (double)blured_bin.cols && rect_points[i].y < (double)blured_bin.rows && rect_points[i].x >=0. && rect_points[i].y >= 0.)
-				if (area > 0.6)
+				if (area > 0.5)
 				{
 					++cond;
 				}
@@ -300,73 +395,132 @@ int main()
 		}
 	}
 	cv::Mat contourIm;
+	cv::copyTo(img, contourIm, img);
+	/*for (int i = 0; i < ncomp; i++)
+	{
+		cv::drawContours(contourIm, contours, (int)i, cv::Scalar(rng(255), rng(255), rng(255)), 3);
+	}*/
+	
 	//contourIm = img;
 	cv::Rect cont(rect_points[0], rect_points[1]);
-	cv::copyTo(img, contourIm, img);
+	
 		for (int j = 0; j < 4; j++)
 		{
 			line(contourIm, rect_points[j], rect_points[(j + 1) % 4], color,3);
 		}
+		cv::Point a, b; 
+		if (lineLenght(rect_points[0], rect_points[1]) > lineLenght(rect_points[1], rect_points[2]))
+		{
+			a = (rect_points[0] + rect_points[1]) / 2;
+			b = (rect_points[2] + rect_points[3]) / 2;
+		}
+		else {
+			a = (rect_points[1] + rect_points[2]) / 2;
+			b = (rect_points[3] + rect_points[1]) / 2;
+		}
 
+		if (a.y > b.y)
+		{
+			std::swap(a, b);
+		}
+		
+		cv::line(contourIm, a, b, cv::Scalar(255, 0, 0), 1);
 		
 
 	print(contourIm, "contours");
 	cv::Mat rot, rotImg;
 	cv::copyTo(blured_bin, rot, blured_bin);
-	//rot = Rotation(contourIm, rect_points[2], rect_points[3]);
-	//print(rot, "Rotation");
-	//cv::Rect2f bbox = minRect;
-	//cv::Rect roi(rect_points[2], rect_points[3]);
-	cv::Rect roi = minRect.boundingRect2f();
+	rot = Rotation(img, a,b, rect_points);
+	/*for (int j = 0; j < 4; j++)
+	{
+		std::cout << rect_points[j];
+		line(rot, rect_points[j], rect_points[(j + 1) % 4], color, 3);
+	}*/
+	print(rot, "Rotation1");
+
+	cv::RotatedRect rotRect(rect_points[0], rect_points[1], rect_points[2]);
+	cv::Rect roi = rotRect.boundingRect2f();
 	cv::Mat imgRoi = rot(roi);
-	rotImg = img(roi);
 	print(imgRoi, "ROI1");
-	
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 128, 255, cv::THRESH_OTSU);
+	print(imgRoi, "ROI_BINARY");
 
-	cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(imgRoi.cols/10, imgRoi.cols/10));
-	cv::morphologyEx(imgRoi, imgRoi, cv::MORPH_CLOSE, element);
-	print(imgRoi, "ROI");
-	
-	cv::Mat dist;
-	cv::distanceTransform(imgRoi, dist, cv::DIST_L2, 3, CV_32F);
 
-	 
-	cv::normalize(dist, dist, 0, 1.0, cv::NORM_MINMAX);
-	//std::cout << imgRoi.type() << " " << dist.type()<<" " << CV_8U << std::endl;
-	print(dist, "distT");
-	
-	cv::threshold(dist, dist, 0.99, 1.0, cv::THRESH_BINARY);
-	cv::normalize(dist, dist, 255, 0, cv::NORM_MINMAX);
-	print(dist, "distTr");
-	cv::Mat dist8u;
-	dist.convertTo(dist8u, CV_8U);
-	//cv::cvtColor(dist, dist, CV_8U);
-	std::cout << imgRoi.type() << " " << dist8u.type() << std::endl;
-	//cv::Canny(dist8u, dist8u, 0, 240);
 	std::vector<cv::Vec4i> lines;
 	std::vector<cv::Vec4i> flines;
-	cv::HoughLinesP(dist8u, lines, 1,  CV_PI / 180, 20, 20);
+	cv::HoughLinesP(imgRoi, lines, 1,  CV_PI / 180, 100, 20);
 	std::cout << lines.size();
-	cv::cvtColor(dist8u, dist8u, cv::COLOR_GRAY2BGR);
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_GRAY2BGR);
 	for (size_t i = 1; i < lines.size(); i++)
 	{
 		cv::Vec4i l = lines[i];
 
 		
-		//double angle = atan2(l[3] - l[1], l[2] - l[0]) * 180.0 / CV_PI;
+		double angle = atan2(l[3] - l[1], l[2] - l[0]) * 180.0 / CV_PI;
 
-		/*if (angle < 150 && angle >= 30) {
+		if (angle < 110 && angle >= 80) {
 			flines.push_back(lines[i]);
 			std::cout << l[0] << "," << l[1] << "," << l[2] << "," << l[3] << std::endl;
 			
-		}*/
-		cv::line(dist8u, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(0, 0, 255), 1);
+		}
+		cv::line(imgRoi, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255, 0, 255), 1);
 	}
+	print(imgRoi, "ROI_Lines");
 
-	print(dist8u, "dist");
-	imgRoi=Rotation(rotImg, cv::Point(lines[0][0], lines[0][1]), cv::Point(lines[0][2], lines[0][3]));
-	print(rotImg, "imgROI");
-	print(imgRoi, "Result");
+
+
+	/*minRect.points(rect_points);
+	rotImg=Rotation(img, a,b, rect_points);
+	for (int j = 0; j < 4; j++)
+	{
+		std::cout << rect_points[j];
+		line(rotImg, rect_points[j], rect_points[(j + 1) % 4], color, 3);
+	}
+	print(rotImg, "Rotation2");*/
+	//cv::Rect2f bbox = minRect;
+	//cv::Rect roi(rect_points[2], rect_points[3]);
+	
+	/*cv::Rect roi = minRect.boundingRect2f();
+	cv::Mat imgRoi = rot(roi);
+	rotImg = img(roi);
+	print(imgRoi, "ROI1");*/
+	
+
+	//cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(imgRoi.cols/10, 1));
+	//cv::morphologyEx(imgRoi, imgRoi, cv::MORPH_CLOSE, element);
+	//
+	//print(imgRoi, "ROI");
+	//cv::Mat sk;
+	//imgRoi= skelet(imgRoi);
+	//print(imgRoi, "skelet");
+	//
+	////
+	//std::vector<cv::Vec4i> lines;
+	//std::vector<cv::Vec4i> flines;
+	//cv::HoughLinesP(imgRoi, lines, 1,  CV_PI / 180, 20, 20);
+	//std::cout << lines.size();
+	//cv::cvtColor(imgRoi, imgRoi, cv::COLOR_GRAY2BGR);
+	//for (size_t i = 1; i < lines.size(); i++)
+	//{
+	//	cv::Vec4i l = lines[i];
+
+	//	
+	//	//double angle = atan2(l[3] - l[1], l[2] - l[0]) * 180.0 / CV_PI;
+
+	//	/*if (angle < 150 && angle >= 30) {
+	//		flines.push_back(lines[i]);
+	//		std::cout << l[0] << "," << l[1] << "," << l[2] << "," << l[3] << std::endl;
+	//		
+	//	}*/
+	//	cv::line(imgRoi, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255, 0, 255), 1);
+	//}
+	//
+	//print(imgRoi, "dist");
+	////imgRoi=Rotation(rotImg, cv::Point(lines[0][0], lines[0][1]), cv::Point(lines[0][2], lines[0][3]));
+	////imgRoi = Rotation(rotImg, cv::Point(lines[0][0], lines[0][1]), cv::Point(lines[0][2], lines[0][3]));
+	//print(rotImg, "imgROI");
+	//print(imgRoi, "Result");
 
 
 
