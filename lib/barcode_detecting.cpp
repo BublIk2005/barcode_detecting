@@ -31,7 +31,7 @@ cv::Mat sharpering(cv::Mat src_filtred)
 	cv::Point anchor = cv::Point(-1, -1);
 	double delta = 0;
 	int ddepth = -1;
-	cv::Mat kernel = (cv::Mat_<double>(3, 3) << -1, -1, -1, -1, 9, -1, -1, -1, -1); 
+	cv::Mat kernel = (cv::Mat_<double>(3, 3) << 0, -1/4, 0, 1/4, 0, -1/4, 0, -1/4, 0); 
 	filter2D(src_filtred, src_sh, ddepth, kernel, anchor, delta, cv::BORDER_DEFAULT);
 	return src_sh;
 }
@@ -54,7 +54,23 @@ cv::Mat scalePyr(cv::Mat &src)
 	
 	return res;
 }
+cv::Mat scaler(cv::Mat& src, double &scale)
+{
+	cv::Mat res;
+	double model = 600.;
+	if (src.cols > model) {
+		scale = src.cols /model;
+		cv::resize(src, res, cv::Size(int(src.cols / scale), int(src.rows / scale)), 0, 0, cv::INTER_AREA);
+	}
+	else if (model > src.cols) {
+		scale = model / src.cols;
+		cv::resize(src, res, cv::Size(int(src.cols * scale), int(src.rows * scale)), 0, 0, cv::INTER_AREA);
+	}
+	else
+		res = src;
 
+	return res;
+}
 
 
 std::vector<std::vector<cv::Point>>  sortContours(std::vector<std::vector<cv::Point>> & contours)
@@ -249,7 +265,7 @@ cv::Mat skelet(cv::Mat img)
 	do
 	{
 		cv::erode(img, eroded, element);
-		cv::dilate(eroded, temp, element); // temp = open(img)
+		cv::dilate(eroded, temp, element); 
 		cv::subtract(img, temp, temp);
 		cv::bitwise_or(skel, temp, skel);
 		eroded.copyTo(img);
@@ -283,8 +299,8 @@ cv::Mat drawHistogram(const cv::Mat& imeg_bin, int intensiv) {
 	}
 	return hist;
 }
-std::vector<int> Histogram(const cv::Mat& imeg_bin, int intensiv) {
-	std::vector<int> histogram(20, 0);
+std::vector<int> countStrokes(const cv::Mat& imeg_bin, int intensiv) {
+	std::vector<int> count;
 	int pixels = 0;
 	for (int i = 0; i < imeg_bin.cols; i++) {
 		if (int(imeg_bin.at<uchar>(imeg_bin.rows / 2, i)) == intensiv)
@@ -294,123 +310,222 @@ std::vector<int> Histogram(const cv::Mat& imeg_bin, int intensiv) {
 		else
 		{
 			if (pixels != 0)
-				histogram[pixels]++;
+				count.push_back(pixels);
 			pixels = 0;
 		}
-
 	}
-	return histogram;
+	if (intensiv == 255 && int(imeg_bin.at<uchar>(imeg_bin.rows / 2, 0)) == intensiv)
+	{
+		count.erase(count.begin());
+	}
+	return count;
 }
-std::vector<std::pair<int, int>> normalizeHist(std::vector<int> hist) {
-	int locMax=0;
-	int locMaxInd = -1;
-	std::vector<std::pair<int,int>> normalizeVec;
-	std::pair<int, int> newValue;
-	std::vector<int> locMaxVec;
-	for (int i = 0; i < hist.size(); i++)
+std::vector<int> normalizeVec(std::vector<int> histB, std::vector<int> histW) {
+	std::vector<int> normalizeVec(histB.size() + histW.size(), 0);
+	int zeroMod = histB[0];
+	int j = 0;
+	for (size_t i = 0; i < normalizeVec.size()-1; i+=2)
 	{
-		if (hist[i] > 0 && hist[i]>locMax) {
-			locMax = hist[i];
-			locMaxInd = i;
-		}
-		else if (locMaxInd != -1) {
-			locMaxVec.push_back(locMaxInd);
-			locMax = 0;
-			locMaxInd = -1;
-		}
-	}
-	int ind = 0;
-	int flag = 0;
-	for (int i = 0; i < hist.size(); i++)
-	{
+		normalizeVec[i] =round(histB[j] / (double)zeroMod); 
 		
-		if (hist[i] > 0) {
-			newValue.first = i;
-			newValue.second = locMaxVec[ind];
-			normalizeVec.push_back(newValue);
-			flag = 1;
-		}
-		else if(flag==1) {
-			++ind;
-			flag = 0;
-		}
+		normalizeVec[i + 1] = round(histW[j] / (double)zeroMod);
+		
+		j++;
 	}
+	normalizeVec[normalizeVec.size() - 1] = round(histB[histB.size() - 1] / (double)zeroMod);
+	return normalizeVec;
+}
+std::vector<int> normalizeVecBit(std::vector<int> histB, std::vector<int> histW) {
+	std::vector<int> normalizeVec;
+	int sizeV = histB.size() + histW.size();
+	int zeroMod = histB[0];
+	int j = 0;
+	for (int i = 0; i < histB.size() + histW.size() - 1; i += 2)
+	{
+		for (int i = 0; i < round(histB[j] / (double)zeroMod); i++)
+		{
+			normalizeVec.push_back(1);
+		}
+		for (int i = 0; i < round(histW[j] / (double)zeroMod); i++)
+		{
+			normalizeVec.push_back(0);
+		}
+		j++;
+	}
+	normalizeVec[normalizeVec.size() - 1] = round(histB[histB.size() - 1] / (double)zeroMod);
 	return normalizeVec;
 }
 
-cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> Bhist, std::vector<int> Whist)
+//cv::Mat drawNormalizeCode(cv::Mat& imeg_bin, std::vector<int> Bhist, std::vector<int> Whist)
+//{
+//	
+//	int bpixels = 0;
+//	int wpixels = 0;
+//	std::vector<int> Blck;
+//	std::vector<int> Whit;
+//	std::vector<std::pair<int, int>> newBhist = normalizeHist(Bhist);
+//	std::vector<std::pair<int, int>> newWhist = normalizeHist(Whist);
+//	
+//	
+//	for (int i = 0; i < imeg_bin.cols; i++) {
+//		int j = 0;
+//		if (int(imeg_bin.at<uchar>(imeg_bin.rows / 2, i)) == 0)
+//		{
+//			if (wpixels != 0)
+//			{
+//				for (int i = 0; i < newWhist.size(); i++)
+//				{
+//					if (wpixels == newWhist[i].first)
+//						wpixels = newWhist[i].first;
+//				}
+//				Whit.push_back(wpixels);
+//			}
+//			wpixels = 0;
+//			bpixels++;
+//		}
+//		else
+//		{
+//			if (bpixels != 0) {
+//				for (int i = 0; i < newBhist.size(); i++)
+//				{
+//					if (bpixels == newBhist[i].first)
+//						bpixels = newBhist[i].first;
+//				}
+//				Blck.push_back(bpixels);
+//			}
+//			bpixels = 0;
+//			wpixels++;
+//		}
+//	}
+//	int mat_h, mat_w;
+//	mat_h = 50;
+//	mat_w = 0;
+//	for (auto item : Blck) {
+//		std::cout << item << std::endl;
+//		mat_w += item;
+//	}
+//	for (auto item : Whit) {
+//		mat_w += item;
+//	}
+//	//mat_w += 200;
+//	cv::Mat barcode(mat_h, mat_w, CV_8UC1);
+//	int step = 0;
+//	if (int(imeg_bin.at<uchar>(imeg_bin.rows / 2, 0)) == 0)
+//	{
+//		for (int i = 0; i < Blck.size(); ++i) {
+//			rectangle(barcode, cv::Point(step, 0), cv::Point(step + Blck[i], mat_h), cv::Scalar(0), -1);
+//			rectangle(barcode, cv::Point(step + Blck[i], 0), cv::Point(step + Blck[i] + Whit[i], mat_h), cv::Scalar(255), -1);
+//			step = step + Blck[i] + Whit[i];
+//		}
+//	}
+//	else
+//	{
+//		for (int i = 0; i < Whit.size(); ++i) {
+//			rectangle(barcode, cv::Point(step, 0), cv::Point(step + Whit[i], mat_h), cv::Scalar(255), -1);
+//			rectangle(barcode, cv::Point(step + Whit[i], 0), cv::Point(step + Blck[i] + Whit[i], mat_h), cv::Scalar(0), -1);
+//			step = step + Blck[i] + Whit[i];
+//		}
+//	}
+//	
+//	print(barcode, "NormalizeBarCode");
+//	return barcode;
+//}
+cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec)
 {
 	
-	int bpixels = 0;
-	int wpixels = 0;
-	std::vector<int> Blck;
-	std::vector<int> Whit;
-	std::vector<std::pair<int, int>> newBhist = normalizeHist(Bhist);
-	std::vector<std::pair<int, int>> newWhist = normalizeHist(Whist);
 	
-	
-	for (int i = 0; i < imeg_bin.cols; i++) {
-		int j = 0;
-		if (int(imeg_bin.at<uchar>(imeg_bin.rows / 2, i)) == 0)
-		{
-			if (wpixels != 0)
-			{
-				for (int i = 0; i < newWhist.size(); i++)
-				{
-					if (wpixels == newWhist[i].first)
-						wpixels = newWhist[i].second;
-				}
-				Whit.push_back(wpixels);
-			}
-			wpixels = 0;
-			bpixels++;
-		}
-		else
-		{
-			if (bpixels != 0) {
-				for (int i = 0; i < newBhist.size(); i++)
-				{
-					if (bpixels == newBhist[i].first)
-						bpixels = newBhist[i].second;
-				}
-				Blck.push_back(bpixels);
-			}
-			bpixels = 0;
-			wpixels++;
-		}
-	}
 	int mat_h, mat_w;
 	mat_h = 50;
 	mat_w = 0;
-	for (auto item : Blck) {
-		std::cout << item << std::endl;
+	for (auto item : normalizeVec) {
+		
 		mat_w += item;
 	}
-	for (auto item : Whit) {
-		mat_w += item;
-	}
-	//mat_w += 200;
 	cv::Mat barcode(mat_h, mat_w, CV_8UC1);
 	int step = 0;
-	if (int(imeg_bin.at<uchar>(imeg_bin.rows / 2, 0)) == 0)
-	{
-		for (int i = 0; i < Blck.size(); ++i) {
-			rectangle(barcode, cv::Point(step, 0), cv::Point(step + Blck[i], mat_h), cv::Scalar(0), -1);
-			rectangle(barcode, cv::Point(step + Blck[i], 0), cv::Point(step + Blck[i] + Whit[i], mat_h), cv::Scalar(255), -1);
-			step = step + Blck[i] + Whit[i];
+		for (int i = 0; i < normalizeVec.size()-1; i+=2) {
+			rectangle(barcode, cv::Point(step, 0), cv::Point(step + normalizeVec[i], mat_h), cv::Scalar(0), -1);
+			rectangle(barcode, cv::Point(step + normalizeVec[i], 0), cv::Point(step + normalizeVec[i] + normalizeVec[i+1], mat_h), cv::Scalar(255), -1);
+			step = step + normalizeVec[i] + normalizeVec[i+1];
 		}
-	}
-	else
-	{
-		for (int i = 0; i < Whit.size(); ++i) {
-			rectangle(barcode, cv::Point(step, 0), cv::Point(step + Whit[i], mat_h), cv::Scalar(255), -1);
-			rectangle(barcode, cv::Point(step + Whit[i], 0), cv::Point(step + Blck[i] + Whit[i], mat_h), cv::Scalar(0), -1);
-			step = step + Blck[i] + Whit[i];
-		}
-	}
-	
+		rectangle(barcode, cv::Point(step, 0), cv::Point(step + normalizeVec[normalizeVec.size()-1], mat_h), cv::Scalar(0), -1);
 	print(barcode, "NormalizeBarCode");
 	return barcode;
+}
+
+std::vector<int> decoder(std::vector<int> vecBit)
+{
+	std::vector<int> result(13, 0);
+	std::string firstNum("");
+	std::map<std::string, std::pair<int, std::string>> encodingNumTable = {
+		{"0001101",{0,"L"}},
+		{"1110010",{0,"R"}},
+		{"0100111",{0,"G"}},
+		{"0011001",{1,"L"}},
+		{"1100110",{1,"R"}},
+		{"0110011",{1,"G"}},
+		{"0010011",{2,"L"}},
+		{"1101100",{2,"R"}},
+		{"0011011",{2,"G"}},
+		{"0111101",{3,"L"}},
+		{"1000010",{3,"R"}},
+		{"0100001",{3,"G"}},
+		{"0100011",{4,"L"}},
+		{"1011100",{4,"R"}},
+		{"0011101",{4,"G"}},
+		{"0110001",{5,"L"}},
+		{"1001110",{5,"R"}},
+		{"0111001",{5,"G"}},
+		{"0101111",{6,"L"}},
+		{"1010000",{6,"R"}},
+		{"0000101",{6,"G"}},
+		{"0111011",{7,"L"}},
+		{"1000100",{7,"R"}},
+		{"0010001",{7,"G"}},
+		{"0110111",{8,"L"}},
+		{"1001000",{8,"R"}},
+		{"0001001",{8,"G"}},
+		{"0001011",{9,"L"}},
+		{"1110100",{9,"R"}},
+		{"0010111",{9,"G"}}
+	};
+	std::map<std::string, int> encodingFirstNumTable = {
+		{"LLLLLLRRRRRR",0},
+		{"LLGLGGRRRRRR",1},
+		{"LLGGLGRRRRRR",2},
+		{"LLGGGLRRRRRR",3},
+		{"LGLLGGRRRRRR",4},
+		{"LGGLLGRRRRRR",5},
+		{"LGGGLLRRRRRR",6},
+		{"LGLGLGRRRRRR",7},
+		{"LGLGGLRRRRRR",8},
+		{"LGGLGLRRRRRR",9}
+	};
+	int k = 1;
+	for (int i(3); i < 44; i+=7)
+	{
+		std::string encod = "";
+		for (int j = i; j - i < 7; ++j) {
+			encod = encod + std::to_string(vecBit[j]);
+		}
+		std::pair<int, std::string> decod = encodingNumTable.find(encod)->second;
+		result[k] = decod.first;
+		firstNum += decod.second;
+		k++;
+	}
+	for (int i(50); i < 92; i += 7)
+	{
+		std::string encod = "";
+		for (int j = i; j - i < 7; ++j) {
+			encod = encod + std::to_string(vecBit[j]);
+		}
+		std::pair<int, std::string> decod = encodingNumTable.find(encod)->second;
+		result[k] = decod.first;
+		firstNum += decod.second;
+		k++;
+	}
+	result[0] = encodingFirstNumTable.find(firstNum)->second;
+	return result;
 }
 int main()
 {
@@ -420,17 +535,20 @@ int main()
 	cv::Mat kernel;
 	kernel = cv::Mat::ones(3, 3, CV_32F) / (float)(3 * 3);
 
-	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test3.jpg", cv::IMREAD_COLOR);
-	cv::Mat src_gray, src_bin, src_fil, src_sh;
+	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test4.jpg", cv::IMREAD_COLOR);
+	cv::Mat src_gray, src_bin, src_fil;
 	cv::cvtColor(img, src_gray, cv::COLOR_BGR2GRAY);
 	src_fil = filtred(src_gray);
-	src_sh = sharpering(src_gray);
-	cv::threshold(src_sh, src_bin, 128, 255, cv::THRESH_OTSU);
+	//cv::Mat_<double> src_sh = src_gray;
+	//src_sh = sharpering(src_sh);
+	//print(src_sh, "filt");
+	//cv::threshold(src_sh, src_bin, 128, 255, cv::THRESH_OTSU);
 	cv::RNG rng(12345);
 	print(img, "barcode");
-
-	src_gray=scalePyr(src_gray);
-
+	
+	//src_gray=scalePyr(src_gray);
+	double sc = 0;
+	src_gray = scaler(src_gray,sc);
 	
 	//print(src_gray, "barcode_gray");
 	//print(src_bin, "barcode_bin");
@@ -443,7 +561,7 @@ int main()
 	int scale =1;
 	//ddepth = CV_32F;
 	cv::Mat kernel_grad, blured_grad;
-	kernel_grad = cv::Mat::ones(3, 3, CV_32F);
+	kernel_grad = cv::Mat::ones(2, 9, CV_32F);
 	Sobel(src_gray, grad_x, ddepth, 1, 0, 3, scale, delta=1, cv::BORDER_DEFAULT);
 	convertScaleAbs(grad_x, abs_grad_x);
 	
@@ -462,7 +580,7 @@ int main()
 	cv::erode(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
 	cv::dilate(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 2);
 	cv::erode(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
-	cv::GaussianBlur(grad, grad, cv::Size(9, 9), 1, 0, cv::BORDER_DEFAULT);
+	//cv::GaussianBlur(grad, grad, cv::Size(9, 9), 1, 0, cv::BORDER_DEFAULT);
 	cv::filter2D(grad, blured_grad, CV_8UC1, kernel_grad);
 	//print(blured_grad, "blured_grad");
 	//blured_grad = grad;
@@ -481,10 +599,10 @@ int main()
 	
 	/*print(blured_bin, "erodil");*/
 
-	kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size_<int>(img.cols/100, 2));
-	cv::morphologyEx(blured_bin, blured_bin, cv::MORPH_CLOSE, kernel);
+	/*kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size_<int>(1, 3));
+	cv::morphologyEx(blured_bin, blured_bin, cv::MORPH_CLOSE, kernel);*/
 	
-	//print(blured_bin, "blured_bin");
+	print(blured_bin, "blured_bin");
 	//cv::Canny(blured_bin, blured_bin, 50, 200);
 	std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hireachy;
@@ -529,20 +647,19 @@ int main()
 		if (ind == 0)
 			cond = 4;
 	}
-	if ((img.cols / 600) >= 2) {
-		scale = img.cols / 600;
+	if (img.cols > 600) {
 		for (size_t i = 0; i < 4; i++)
 		{
-			rect_points[i] = rect_points[i] * scale;
+			rect_points[i] = rect_points[i] * sc;
 		}
 	}
-	else if ((600 / img.cols) >= 2) {
-		scale = 600/img.cols;
+	else if (600 > img.cols) {
 		for (size_t i = 0; i < 4; i++)
 		{
-			rect_points[i] = rect_points[i] / scale;
+			rect_points[i] = rect_points[i] / sc;
 		}
 	}
+	
 	cv::Mat contourIm;
 	cv::copyTo(img, contourIm, img);
 	/*for (int i = 0; i < ncomp; i++)
@@ -590,134 +707,55 @@ int main()
 	cv::RotatedRect rotRect(rect_points[0], rect_points[1], rect_points[2]);
 	cv::Rect roi = rotRect.boundingRect2f();
 	cv::Mat imgRoi = rot(roi);
+	//cv::imshow("RealR", imgRoi);
 	print(imgRoi, "ROI");
 	//imgRoi = sharpering(imgRoi);
-	print(imgRoi, "ROI1");
+	int aP = 0;
+	int bP = 0;
+	
+	//imgRoi=Rotation(imgRoi, P1, P2);
 	if (imgRoi.cols / 90 < 3)
 	{
 		cv::pyrUp(imgRoi, imgRoi, cv::Size(imgRoi.cols*2, imgRoi.rows*2), cv::BORDER_DEFAULT);
 	}
-	std::cout << imgRoi.cols << std::endl;
+	print(imgRoi, "ROI1");
+	//cv::Mat roiBin = imgRoi;
 	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
-	cv::threshold(imgRoi, imgRoi, 220, 255, cv::THRESH_OTSU);
-	print(imgRoi, "ROI_BINARY");
+	//cv::Canny(imgRoi, imgRoi, 80, 255);
+	print(imgRoi, "ROI_GRAY");
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
 	
-	std::vector<int> Whist=Histogram(imgRoi, 255);
-	std::vector<int> Bhist =Histogram(imgRoi, 0);
-	std::vector<std::pair<int, int>> W = normalizeHist(Whist);
-	
-	for (auto& item:W)
+	/*while (int(roiBin.at<uchar>(roiBin.rows / 2, aP)) == 255)
 	{
-		std::cout << item.first << " " << item.second << std::endl;
+		aP++;
+		std::cout << "lox" << aP << std::endl;
 	}
-
-	drawCode(imgRoi, Bhist, Whist);
-	
-	//std::vector<cv::Vec4i> lines;
-	//std::vector<cv::Vec4i> flines;
-	//cv::HoughLinesP(imgRoi, lines, 1,  CV_PI / 180, 100, 20);
-	//std::cout << lines.size();
-	//cv::cvtColor(imgRoi, imgRoi, cv::COLOR_GRAY2BGR);
-	//for (size_t i = 1; i < lines.size(); i++)
-	//{
-	//	cv::Vec4i l = lines[i];
-
-	//	
-	//	double angle = atan2(l[3] - l[1], l[2] - l[0]) * 180.0 / CV_PI;
-
-	//	if (angle < 110 && angle >= 80) {
-	//		flines.push_back(lines[i]);
-	//		std::cout << l[0] << "," << l[1] << "," << l[2] << "," << l[3] << std::endl;
-	//		
-	//	}
-	//	cv::line(imgRoi, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255, 0, 255), 1);
-	//}
-	//print(imgRoi, "ROI_Lines");
-
-
-
-	/*minRect.points(rect_points);
-	rotImg=Rotation(img, a,b, rect_points);
-	for (int j = 0; j < 4; j++)
+	while (int(roiBin.at<uchar>(roiBin.rows / 4,bP)) == 255)
 	{
-		std::cout << rect_points[j];
-		line(rotImg, rect_points[j], rect_points[(j + 1) % 4], color, 3);
+		bP++;
 	}
-	print(rotImg, "Rotation2");*/
-	//cv::Rect2f bbox = minRect;
-	//cv::Rect roi(rect_points[2], rect_points[3]);
+	cv::Point2f P1(bP, roiBin.rows / 4);
+	cv::Point2f P2(aP, roiBin.rows / 2);*/
+	/*cv::Point2f P1(0, imgRoi.rows/2);
+	cv::Point2f P2(imgRoi.cols , imgRoi.rows / 2);*/
+	//cv::line(imgRoi, P1, P2, cv::Scalar(100, 100, 100));
+	//imgRoi=Rotation(imgRoi, P1, P2);
+	print(imgRoi, "ROI_BIN");
 	
-	/*cv::Rect roi = minRect.boundingRect2f();
-	cv::Mat imgRoi = rot(roi);
-	rotImg = img(roi);
-	print(imgRoi, "ROI1");*/
-	
-
-	//cv::Mat element = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(imgRoi.cols/10, 1));
-	//cv::morphologyEx(imgRoi, imgRoi, cv::MORPH_CLOSE, element);
-	//
-	//print(imgRoi, "ROI");
-	//cv::Mat sk;
-	//imgRoi= skelet(imgRoi);
-	//print(imgRoi, "skelet");
-	//
-	////
-	//std::vector<cv::Vec4i> lines;
-	//std::vector<cv::Vec4i> flines;
-	//cv::HoughLinesP(imgRoi, lines, 1,  CV_PI / 180, 20, 20);
-	//std::cout << lines.size();
-	//cv::cvtColor(imgRoi, imgRoi, cv::COLOR_GRAY2BGR);
-	//for (size_t i = 1; i < lines.size(); i++)
-	//{
-	//	cv::Vec4i l = lines[i];
-
-	//	
-	//	//double angle = atan2(l[3] - l[1], l[2] - l[0]) * 180.0 / CV_PI;
-
-	//	/*if (angle < 150 && angle >= 30) {
-	//		flines.push_back(lines[i]);
-	//		std::cout << l[0] << "," << l[1] << "," << l[2] << "," << l[3] << std::endl;
-	//		
-	//	}*/
-	//	cv::line(imgRoi, cv::Point(l[0], l[1]), cv::Point(l[2], l[3]), cv::Scalar(255, 0, 255), 1);
-	//}
-	//
-	//print(imgRoi, "dist");
-	////imgRoi=Rotation(rotImg, cv::Point(lines[0][0], lines[0][1]), cv::Point(lines[0][2], lines[0][3]));
-	////imgRoi = Rotation(rotImg, cv::Point(lines[0][0], lines[0][1]), cv::Point(lines[0][2], lines[0][3]));
-	//print(rotImg, "imgROI");
-	//print(imgRoi, "Result");
-
-
-
-
-	//cv::Mat marker(cv::Size(img.cols, img.rows), img.type());
-	//for (int j = 0; j < 4; j++)
-	//{
-	//	line(marker, rect_points[j], rect_points[(j + 1) % 4], color, 3);
-	//}
-
-	//cv::Mat hlines;
-	//cv::cvtColor(imgRoi, hlines, cv::COLOR_BGR2GRAY);
-	////hlines = sharpering(hlines);
-	////cv::pyrUp(hlines, hlines, cv::Size(hlines.cols*2, hlines.rows*2));
-	//cv::threshold(hlines, hlines, 180, 255, cv::THRESH_OTSU);
-	//
-	//cv::Canny(hlines, hlines, 150, 300, 5);
-	//std::vector<std::vector<cv::Point> > conr;
-	//cv::findContours(hlines, conr, cv::RETR_CCOMP, cv::CHAIN_APPROX_TC89_KCOS, cv::Point());
-	//cv::cvtColor(hlines, hlines, cv::COLOR_GRAY2BGR);
-	/*for (int i = 0; i < conr.size(); i++)
+	std::vector<int> Whist=countStrokes(imgRoi, 255);
+	std::vector<int> Bhist = countStrokes(imgRoi, 0);
+	std::vector<int> vec = normalizeVec(Bhist,Whist);
+	std::vector<int> vecBit = normalizeVecBit(Bhist, Whist);
+	/*for (auto it : vecBit)
 	{
-		cv::drawContours(hlines, conr, (int)i, cv::Scalar(rng(255), rng(255), rng(255)),-1);
+		std::cout << it;
 	}*/
-
 	
-
-	
-	//imgRoi = Rotation(imgRoi, cv::Point(flines[0][2], flines[0][3]), cv::Point(flines[0][0], flines[0][1]));
-	//marker = Rotation(marker, cv::Point(flines[0][2], flines[0][3]), cv::Point(flines[0][0], flines[0][1]));
-	//print(imgRoi, "Hough");
+	drawCode(imgRoi, vec);
+	std::vector<int> res = decoder(vecBit);
+	for (auto item : res) {
+		std::cout << item;
+	}
 	cv::waitKey(0);
 	return 0;
 }
