@@ -1,5 +1,4 @@
-#include<opencv2/opencv.hpp>
-#include<math.h>
+#include"barcode_detecting.h"
 
 
 void print(cv::Mat src, std::string window_name)
@@ -22,10 +21,10 @@ cv::Mat filtred(cv::Mat src_bin)
 }
 
 //600x450
-cv::Mat scaler(cv::Mat& src, double &scale)
+cv::Mat scaler(cv::Mat& src, double &scale, double modelSize)
 {
 	cv::Mat res;
-	double model = 600.;
+	double model = modelSize;
 	if (src.cols > model) {
 		scale = src.cols /model;
 		cv::resize(src, res, cv::Size(int(src.cols / scale), int(src.rows / scale)), 0, 0, cv::INTER_AREA);
@@ -38,7 +37,21 @@ cv::Mat scaler(cv::Mat& src, double &scale)
 		res = src;
 	return res;
 }
-
+void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double& scale, double modelSize)
+{
+	if (img.cols > modelSize) {
+		for (size_t i = 0; i < 4; i++)
+		{
+			rect_points[i] = rect_points[i] * scale;
+		}
+	}
+	else if (modelSize > img.cols) {
+		for (size_t i = 0; i < 4; i++)
+		{
+			rect_points[i] = rect_points[i] / scale;
+		}
+	}
+}
 
 std::vector<std::vector<cv::Point>>  sortContours(std::vector<std::vector<cv::Point>> & contours)
 {
@@ -176,7 +189,6 @@ void contours(cv::Mat & grad, cv::Point2f* rect_points) {
 	contours = sortContours(contours);
 	cv::RotatedRect minRect;
 	cv::Scalar color = cv::Scalar(0, 255, 0);
-	//cv::Point2f rect_points[4];
 	int imgArea = grad.cols * grad.rows;
 	int cond = 0;
 	int ind = ncomp - 1;
@@ -200,35 +212,13 @@ void contours(cv::Mat & grad, cv::Point2f* rect_points) {
 			cond = 4;
 	}
 }
-//cv::Mat findBarcode(cv::Mat src)
-//{
-//	std::vector<std::pair<cv::Mat, cv::RotatedRect>> result;
-//	cv::Mat src_gray, src_bin, src_fil, src_sh;
-//	cv::cvtColor(src, src_gray, cv::COLOR_BGR2GRAY);
-//	cv::RNG rng(12345);
-//	std::vector<cv::Mat> gradients = Gradients(src_gray);
-//	int scale=1;
-//	char* UporDown=" ";
-//	if ((src.cols / 600) >= 2) {
-//		scale = src.cols / 600;
-//		UporDown = "Up";
-//	}
-//	else if ((600 / src.cols) >= 2) {
-//		scale = 600 / src.cols;
-//		UporDown = "Down";
-//	}
-//	else scale = 1;
-//
-//	for (int i = 0; i < gradients.size(); ++i) {
-//		contours(gradients[i], scale, UporDown);
-//	}
-//
-//
-//	delete UporDown;
-//	
-//	return src;
-//}
 
+bool check(std::vector<int> vecBit)
+{
+	if (vecBit.size() == 94)
+		return true;
+	else return false;
+}
 
 std::vector<int> countStrokes(const cv::Mat& imeg_bin, int intensiv) {
 	std::vector<int> count;
@@ -283,12 +273,13 @@ std::vector<int> normalizeVecBit(std::vector<int> histB, std::vector<int> histW)
 		}
 		j++;
 	}
-	normalizeVec[normalizeVec.size() - 1] = round(histB[histB.size() - 1] / (double)zeroMod);
+//	normalizeVec[normalizeVec.size() - 1] = round(histB[histB.size() - 1] / (double)zeroMod);
 	return normalizeVec;
 }
 
 cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec)
 {
+	
 	int mat_h, mat_w;
 	mat_h = 50;
 	mat_w = 0;
@@ -310,6 +301,11 @@ cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec)
 
 std::vector<int> decoder(std::vector<int> vecBit)
 {
+	if (check(vecBit) == false)
+	{
+		std::cout << "Failed to recognize the barcode" << std::endl;
+		std::exit(0);
+	}
 	std::vector<int> result(13, 0);
 	std::string firstNum("");
 	std::map<std::string, std::pair<int, std::string>> encodingNumTable = {
@@ -382,40 +378,42 @@ std::vector<int> decoder(std::vector<int> vecBit)
 	result[0] = encodingFirstNumTable.find(firstNum)->second;
 	return result;
 }
-int main()
+void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale)
 {
-	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test4.jpg", cv::IMREAD_COLOR);
+	cv::Mat img = src;
 	cv::Mat src_gray, src_bin;
 	cv::cvtColor(img, src_gray, cv::COLOR_BGR2GRAY);
 	print(img, "barcode");
 	double sc = 0;
-	src_gray = scaler(src_gray,sc);
+	src_gray = scaler(src_gray, sc, scale);
 	cv::Mat grad = Gradient(src_gray);
-
-	cv::Scalar color = cv::Scalar(0, 255, 0);
-	cv::Point2f rect_points[4];
 	contours(grad, rect_points);
-	if (img.cols > 600) {
-		for (size_t i = 0; i < 4; i++)
-		{
-			rect_points[i] = rect_points[i] * sc;
-		}
-	}
-	else if (600 > img.cols) {
-		for (size_t i = 0; i < 4; i++)
-		{
-			rect_points[i] = rect_points[i] / sc;
-		}
-	}
-	
-	cv::Mat contourIm;
-	cv::copyTo(img, contourIm, img);
-		for (int j = 0; j < 4; j++)
-		{
-			line(contourIm, rect_points[j], rect_points[(j + 1) % 4], color,3);
-		}
+	contoursScaler(img, rect_points, sc, scale);
+}
 
-		cv::Point a, b; 
+int main()
+{
+	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test1.jpg", cv::IMREAD_COLOR);
+	std::vector<int> standartScales = { 600, 400, 200, 100, 1200 };
+	int flag=0;
+	cv::Point2f rect_points[4];
+	cv::Mat contourIm;
+	cv::Scalar color = cv::Scalar(0, 255, 0);
+	cv::Point a, b;
+	std::vector<int> vecBit;
+	
+	cv::Mat rot, rotImg;
+	cv::RotatedRect rotRect;
+	cv::Rect roi;
+	cv::Mat imgRoi;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	std::vector<int> vec;
+	bool stop = false;
+
+	while (!stop)
+	{
+		findBarcode(img, rect_points, standartScales[flag]);
 		if (lineLenght(rect_points[0], rect_points[1]) > lineLenght(rect_points[1], rect_points[2]))
 		{
 			a = (rect_points[0] + rect_points[1]) / 2;
@@ -425,37 +423,37 @@ int main()
 			a = (rect_points[1] + rect_points[2]) / 2;
 			b = (rect_points[3] + rect_points[1]) / 2;
 		}
-
 		if (a.y > b.y)
 		{
 			std::swap(a, b);
 		}
-		
-		cv::line(contourIm, a, b, cv::Scalar(255, 0, 0), 1);
-		
+		rot = Rotation(img, a, b, rect_points);
+		rotRect= cv::RotatedRect(rect_points[0], rect_points[1], rect_points[2]);
+		roi = rotRect.boundingRect2f();
+		imgRoi = rot(roi);
+		cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+		cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+		Whist = countStrokes(imgRoi, 255);
+		Bhist = countStrokes(imgRoi, 0);
+		vec = normalizeVec(Bhist, Whist);
+		vecBit = normalizeVecBit(Bhist, Whist);
+		++flag;
+		if ((vecBit.size() == 94) || (flag == standartScales.size()-1))
+		{
+			stop = true;
+		}
+	} 
 
-	print(contourIm, "contours");
-	cv::Mat rot, rotImg;
-	rot = Rotation(img, a,b, rect_points);
-	cv::RotatedRect rotRect(rect_points[0], rect_points[1], rect_points[2]);
-	cv::Rect roi = rotRect.boundingRect2f();
-	cv::Mat imgRoi = rot(roi);
-	print(imgRoi, "ROI");
-	int aP = 0;
-	int bP = 0;
-	if (imgRoi.cols / 90 < 3)
+
+
+	cv::copyTo(img, contourIm, img);
+	for (int j = 0; j < 4; j++)
 	{
-		cv::pyrUp(imgRoi, imgRoi, cv::Size(imgRoi.cols*2, imgRoi.rows*2), cv::BORDER_DEFAULT);
+		line(contourIm, rect_points[j], rect_points[(j + 1) % 4], color, 3);
 	}
-	print(imgRoi, "ROI1");
-	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
-	print(imgRoi, "ROI_GRAY");
-	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+	print(contourIm, "contours");
+	print(imgRoi, "ROI");
 	print(imgRoi, "ROI_BIN");
-	std::vector<int> Whist=countStrokes(imgRoi, 255);
-	std::vector<int> Bhist = countStrokes(imgRoi, 0);
-	std::vector<int> vec = normalizeVec(Bhist,Whist);
-	std::vector<int> vecBit = normalizeVecBit(Bhist, Whist);
 	drawCode(imgRoi, vec);
 	std::vector<int> res = decoder(vecBit);
 	for (auto item : res) {
