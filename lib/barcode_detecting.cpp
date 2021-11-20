@@ -37,7 +37,7 @@ cv::Mat scaler(cv::Mat& src, double &scale, double modelSize)
 		res = src;
 	return res;
 }
-void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double& scale, double modelSize)
+void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double scale, double modelSize)
 {
 	if (img.cols > modelSize) {
 		for (size_t i = 0; i < 4; i++)
@@ -80,7 +80,10 @@ cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)
 	cv::Point2f vec = b - a;
 	cv::Point2f dir(0, img.rows);
 	float cos = (vec.x * dir.x + vec.y * dir.y) / (sqrt(vec.x * vec.x + vec.y * vec.y) * sqrt(dir.x * dir.x + dir.y * dir.y));
-	float angle = -57.3*acosf(cos);
+	float sin = (vec.x * dir.y - vec.y * dir.x) / (sqrt(vec.x * vec.x + vec.y * vec.y) * sqrt(dir.x * dir.x + dir.y * dir.y));
+	float angle = 57.3 * acosf(cos);
+	if (sin < 0 && cos < 0 || cos>0 && sin > 0)
+		angle = -angle;
 
 	cv::Point2f center((img.cols - 1) / 2.0, (img.rows - 1) / 2.0);
 	cv::Mat rot = cv::getRotationMatrix2D(center, angle, 1.0);
@@ -90,9 +93,6 @@ cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)
 
 	cv::Mat result;
 	cv::warpAffine(img, result, rot, bbox.size());
-	
-	
-	
 	return result;
 }
 
@@ -202,7 +202,7 @@ void contours(cv::Mat & grad, cv::Point2f* rect_points) {
 		{
 
 			if (rect_points[i].x < (double)blured_bin.cols && rect_points[i].y < (double)blured_bin.rows && rect_points[i].x >= 0. && rect_points[i].y >= 0.)
-				if (area > 0.5)
+				if (area > 0.7)
 				{
 					++cond;
 				}
@@ -378,6 +378,108 @@ std::vector<int> decoder(std::vector<int> vecBit)
 	result[0] = encodingFirstNumTable.find(firstNum)->second;
 	return result;
 }
+std::string decoderStr(std::vector<int> vecBit)
+{
+	/*if (check(vecBit) == false)
+	{
+		return "Failed to recognize the barcode";
+	}*/
+	std::string result("");
+	std::string firstNum("");
+	bool dontFoundFirstNum(false);
+	std::map<std::string, std::pair<int, std::string>> encodingNumTable = {
+		{"0001101",{0,"L"}},
+		{"1110010",{0,"R"}},
+		{"0100111",{0,"G"}},
+		{"0011001",{1,"L"}},
+		{"1100110",{1,"R"}},
+		{"0110011",{1,"G"}},
+		{"0010011",{2,"L"}},
+		{"1101100",{2,"R"}},
+		{"0011011",{2,"G"}},
+		{"0111101",{3,"L"}},
+		{"1000010",{3,"R"}},
+		{"0100001",{3,"G"}},
+		{"0100011",{4,"L"}},
+		{"1011100",{4,"R"}},
+		{"0011101",{4,"G"}},
+		{"0110001",{5,"L"}},
+		{"1001110",{5,"R"}},
+		{"0111001",{5,"G"}},
+		{"0101111",{6,"L"}},
+		{"1010000",{6,"R"}},
+		{"0000101",{6,"G"}},
+		{"0111011",{7,"L"}},
+		{"1000100",{7,"R"}},
+		{"0010001",{7,"G"}},
+		{"0110111",{8,"L"}},
+		{"1001000",{8,"R"}},
+		{"0001001",{8,"G"}},
+		{"0001011",{9,"L"}},
+		{"1110100",{9,"R"}},
+		{"0010111",{9,"G"}}
+	};
+	std::map<std::string, int> encodingFirstNumTable = {
+		{"LLLLLLRRRRRR",0},
+		{"LLGLGGRRRRRR",1},
+		{"LLGGLGRRRRRR",2},
+		{"LLGGGLRRRRRR",3},
+		{"LGLLGGRRRRRR",4},
+		{"LGGLLGRRRRRR",5},
+		{"LGGGLLRRRRRR",6},
+		{"LGLGLGRRRRRR",7},
+		{"LGLGGLRRRRRR",8},
+		{"LGGLGLRRRRRR",9}
+	};
+	int k = 1;
+	std::map<std::string, std::pair<int, std::string>>::iterator it;
+	for (int i(3); i < 44; i += 7)
+	{
+		std::string encod = "";
+		for (int j = i; j - i < 7; ++j) {
+			encod = encod + std::to_string(vecBit[j]);
+		}
+		it = encodingNumTable.find(encod);
+		if (it != encodingNumTable.end())
+		{
+			std::pair<int, std::string> decod = encodingNumTable.find(encod)->second;
+			result += std::to_string(decod.first);
+			firstNum += decod.second;
+		}
+		else
+		{
+			result +="*";
+			dontFoundFirstNum = true;
+		}
+	}
+	for (int i(50); i < 92; i += 7)
+	{
+		std::string encod = "";
+		for (int j = i; j - i < 7; ++j) {
+			encod = encod + std::to_string(vecBit[j]);
+		}
+		it = encodingNumTable.find(encod);
+		if (it != encodingNumTable.end())
+		{
+			std::pair<int, std::string> decod = encodingNumTable.find(encod)->second;
+			result += std::to_string(decod.first);
+			firstNum += decod.second;
+		}
+		else
+		{
+			result += "*";
+			dontFoundFirstNum = true;
+		}
+	}
+	if (dontFoundFirstNum)
+	{
+		result = "*" + result;
+	}
+	else {
+		result = std::to_string(encodingFirstNumTable.find(firstNum)->second)+result;
+	}
+	return result;
+}
 void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale)
 {
 	cv::Mat img = src;
@@ -393,8 +495,9 @@ void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale)
 
 int main()
 {
-	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test1.jpg", cv::IMREAD_COLOR);
-	std::vector<int> standartScales = { 600, 400, 200, 100, 1200 };
+	cv::Mat img = cv::imread("E:/Projects/barcode_detecting/data/test32.jpg", cv::IMREAD_COLOR);
+	std::vector<int> standartScales = { 500,200,400,600};
+	//std::vector<int> standartScales = { 500};
 	int flag=0;
 	cv::Point2f rect_points[4];
 	cv::Mat contourIm;
@@ -405,7 +508,7 @@ int main()
 	cv::Mat rot, rotImg;
 	cv::RotatedRect rotRect;
 	cv::Rect roi;
-	cv::Mat imgRoi;
+	cv::Mat imgRoi,imgRoiBin;
 	std::vector<int> Whist;
 	std::vector<int> Bhist;
 	std::vector<int> vec;
@@ -414,6 +517,12 @@ int main()
 	while (!stop)
 	{
 		findBarcode(img, rect_points, standartScales[flag]);
+		cv::copyTo(img, contourIm, img);
+		for (int j = 0; j < 4; j++)
+		{
+			line(contourIm, rect_points[j], rect_points[(j + 1) % 4], color, 3);
+		}
+		print(contourIm, "contours");
 		if (lineLenght(rect_points[0], rect_points[1]) > lineLenght(rect_points[1], rect_points[2]))
 		{
 			a = (rect_points[0] + rect_points[1]) / 2;
@@ -428,34 +537,89 @@ int main()
 			std::swap(a, b);
 		}
 		rot = Rotation(img, a, b, rect_points);
-		rotRect= cv::RotatedRect(rect_points[0], rect_points[1], rect_points[2]);
+		rotRect = cv::RotatedRect(rect_points[0], rect_points[1], rect_points[2]);
 		roi = rotRect.boundingRect2f();
 		imgRoi = rot(roi);
+		cv::medianBlur(imgRoi, imgRoi, 5);
+		//cv::resize(imgRoi, imgRoi, cv::Size(4000, 4000), 0, 0, cv::INTER_AREA);
+
 		cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+		/*cv::threshold(imgRoi, imgRoiBin, 100, 255, cv::THRESH_OTSU);
+		int aP = 0;
+		int bP = 0;
+		int cP = 0;
+		int dP = 0;
+		int p=0;
+		while(aP==0)
+		{
+			if (int(imgRoiBin.at<uchar>(imgRoiBin.rows / 4, p)) == 0)
+			{
+				aP=p;
+			}
+			p++;
+		}
+		p = 0;
+		while (bP == 0)
+		{
+			if (int(imgRoiBin.at<uchar>(imgRoiBin.rows / 4 * 3, p)) == 0)
+			{
+				bP = p;
+			}
+			p++;
+		}
+		p = imgRoiBin.cols-1;
+		while (cP == 0)
+		{
+			if (int(imgRoiBin.at<uchar>(imgRoiBin.rows / 4, p)) == 0)
+			{
+				cP = p;
+			}
+			p--;
+		}
+		p = imgRoiBin.cols - 1;
+		while (dP == 0)
+		{
+			if (int(imgRoiBin.at<uchar>(imgRoiBin.rows / 4 * 3, p)) == 0)
+			{
+				dP = p;
+			}
+			p--;
+		}
+		cv::Point2f roi_points[4]{ cv::Point(aP-2, imgRoi.rows / 4), cv::Point(bP-2, imgRoi.rows / 4 * 3), cv::Point(cP, imgRoi.rows / 4), cv::Point(dP, imgRoi.rows / 4 * 3) };
+		cv::line(imgRoi, cv::Point(cP+4, imgRoi.rows / 4), cv::Point(dP+4, imgRoi.rows / 4 * 3), cv::Scalar(0));
+		rot= Rotation(imgRoi, cv::Point(aP, imgRoi.rows / 4), cv::Point(bP, imgRoi.rows / 4*3), roi_points);
+
+
+		roi = cv::Rect(roi_points[0],roi_points[3]);
+		imgRoi = rot(roi);*/
+		print(imgRoi, "ROI");
 		cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+		print(imgRoi, "ROI_BIN");
+
+		//cv::adaptiveThreshold(imgRoi, imgRoi, 255, cv::ADAPTIVE_THRESH_GAUSSIAN_C, cv::THRESH_BINARY, imgRoi.cols/100+1, 2);
 		Whist = countStrokes(imgRoi, 255);
 		Bhist = countStrokes(imgRoi, 0);
 		vec = normalizeVec(Bhist, Whist);
 		vecBit = normalizeVecBit(Bhist, Whist);
 		++flag;
-		if ((vecBit.size() == 94) || (flag == standartScales.size()-1))
+		
+		if ((vec.size() == 59) || (flag == standartScales.size()))
 		{
 			stop = true;
 		}
-	} 
-
-
-
-	cv::copyTo(img, contourIm, img);
-	for (int j = 0; j < 4; j++)
-	{
-		line(contourIm, rect_points[j], rect_points[(j + 1) % 4], color, 3);
+		std::cout << vec.size() << std::endl;
 	}
-	print(contourIm, "contours");
-	print(imgRoi, "ROI");
-	print(imgRoi, "ROI_BIN");
+
+	
+	
+	
+	
 	drawCode(imgRoi, vec);
-	std::vector<int> res = decoder(vecBit);
+	std::string res = decoderStr(vecBit);
+	for (auto item : vec) {
+		std::cout << item;
+	}
+	std::cout << std::endl;
 	for (auto item : res) {
 		std::cout << item;
 	}

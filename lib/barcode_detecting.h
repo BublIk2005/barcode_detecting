@@ -15,7 +15,7 @@ cv::Mat filtred(cv::Mat src_bin);
 
 cv::Mat scaler(cv::Mat& src, double& scale, double modelSize);
 
-void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double& scale, double modelSize);
+void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double scale, double modelSize);
 
 std::vector<std::vector<cv::Point>>  sortContours(std::vector<std::vector<cv::Point>>& contours);
 
