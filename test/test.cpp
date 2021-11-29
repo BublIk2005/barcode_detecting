@@ -16,7 +16,6 @@ int main()
 	}
 	print(contourIm, "contours");
 	print(normalizeCode, "NormalizeBarcode");
-	std::cout << vecBit.size() << std::endl;
 	std::string res = decoderStr(vecBit);
 	std::cout << "Product ID: ";
 	for (auto item : res) {
