@@ -9,6 +9,7 @@
 /// @param src Изображение
 /// @param window_name Имя окна
 void print(cv::Mat src, std::string window_name);
+cv::Mat sharp(cv::Mat src);
 /// @brief Функция изменяющая размеры изображения
 /// @param src Входное изображение
 /// @param scale Масштаб нового изображения относительно входного
@@ -91,6 +92,7 @@ std::string decoderStr(std::vector<int> vecBit);
 /// @param rect_points Массив вершин прямоугольного контура
 /// @param scale Масштаб в котором происходит поиск контура
 void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale);
+void approxIm(cv::Mat src_bin,cv::Mat &dst);
 /// @brief Функция предназначенная для поиска штрихкода на изображении
 /// @param src Исходное изображение
 /// @param rect_points Массив вершин прямоугольного контура
