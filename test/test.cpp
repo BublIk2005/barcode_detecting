@@ -2,7 +2,8 @@
 
 int main()
 {
-	cv::Mat img = cv::imread("data/test15.jpg", cv::IMREAD_COLOR);
+	cv::Mat img = cv::imread("data/test5.jpg", cv::IMREAD_COLOR);
+	print(img, "Source");
 	cv::Point2f rect_points[4];
 	cv::Mat contourIm;
 	cv::Scalar color = cv::Scalar(0, 255, 0);
