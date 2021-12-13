@@ -8,20 +8,20 @@
 /// @brief Функция выводящая изображение на экран
 /// @param src Изображение
 /// @param window_name Имя окна
-void print(cv::Mat src, std::string window_name);
-cv::Mat sharp(cv::Mat src);
+void print(const cv::Mat &src, std::string window_name);
+cv::Mat sharp(const cv::Mat &src);
 /// @brief Функция изменяющая размеры изображения
 /// @param src Входное изображение
 /// @param scale Масштаб нового изображения относительно входного
 /// @param modelSize Новая ширина изображения
 /// @return Изображение в новом масштабе
-cv::Mat scaler(cv::Mat& src, double& scale, double modelSize);
+cv::Mat scaler(const cv::Mat& src, double& scale, double modelSize);
 /// @brief Функция изменяющая размер прямоугольного контура для переноса на изображение с измененным масштабом
 /// @param img Изображение с измененным масштабом на которое нужно перенести прямоугольный контур
 /// @param rect_points Массив вершин прямоугольного контура
 /// @param scale Новый масштаб к которому нужно привести размеры контура
 /// @param modelSize Ширина изначального изображения
-void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double scale, double modelSize);
+void contoursScaler(const cv::Mat &img, cv::Point2f* rect_points, double scale, double modelSize);
 /// @brief Функция предназначенная для сортировки контуров по площади
 /// @param contours Входное множество точек контуров
 /// @return множество точек контуров отсортированное по уменьшению площади
@@ -36,22 +36,22 @@ double lineLenght(cv::Point2f a, cv::Point2f b);
 /// @param a Точка А линии относительно которой происходит поворот
 /// @param b Точка B линии относительно которой происходит поворот
 /// @return Повернутое изображение
-cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b);
+cv::Mat Rotation(const cv::Mat &img, cv::Point2f a, cv::Point2f b);
 /// @brief Функция предназначенная для поворота изображения
 /// @param img Входное изображение
 /// @param a Точка А линии относительно которой происходит поворот
 /// @param b Точка B линии относительно которой происходит поворот
 /// @param rect_points Массив вершин прямоугольного контура
 /// @return Повернутое изображение
-cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_points);
+cv::Mat Rotation(const cv::Mat &img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_points);
 /// @brief Функция находящая модуль разницы между градиентом изображения по dx и градиентом по dy
 /// @param src_gray Входное изображение в градациях серого
 /// @return Модуль разницы между градиентом изображения по dx и градиентом по dy
-cv::Mat Gradient(cv::Mat src_gray);
+cv::Mat Gradient(const cv::Mat &src_gray);
 /// @brief Функция для нахождения контура штрихкода на изображении
 /// @param grad Входное изображение содержащее модуль разницы между градиентом изображения по dx и градиентом по dy исходного изображения
 /// @param rect_points Массив вершин прямоугольного контура
-void contours(cv::Mat& grad, cv::Point2f* rect_points);
+void contours(const cv::Mat& grad, cv::Point2f* rect_points);
 /// @brief Функция для проверки размера найденой битовой последовательности штрихкода
 /// @param vecBit Битовая последовательность найденая при чтении штрихкода
 /// @return Результат проверки (успешно либо неуспешно)
@@ -78,25 +78,25 @@ std::vector<int> normalizeVecBit(std::vector<int> histB, std::vector<int> histW)
 /// @param imeg_bin Матрица на которой будет отрисовываться штрихкод
 /// @param normalizeVec Нормализованный вектор содержащий значения ширины штрихов и пробелов штрихкода
 /// @return Изображение нормализированного штрихкода
-cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec);
+cv::Mat drawCode(const cv::Mat& imeg_bin, std::vector<int> normalizeVec);
 /// @brief Функция для декодирования битовой последовательности считанной с штрихкода
 /// @param vecBit Битовая последовательность считанная с штрихкода
 /// @return Идентификатор товара в виде вектора 
-std::vector<int> decoder(std::vector<int> vecBit);
+std::vector<int> decoder(const std::vector<int> &vecBit);
 /// @brief Функция для декодирования битовой последовательности считанной с штрихкода
 /// @param vecBit Битовая последовательность считанная с штрихкода
 /// @return Идентификатор товара в виде строки
-std::string decoderStr(std::vector<int> vecBit);
+std::string decoderStr(const std::vector<int> &vecBit);
 /// @brief Фуекция предназначенная для поиска штрихкода на изображении в различных масштабах
 /// @param src Исходное изображение
 /// @param rect_points Массив вершин прямоугольного контура
 /// @param scale Масштаб в котором происходит поиск контура
-void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale);
-void approxIm(cv::Mat src_bin,cv::Mat &dst);
+void findBarcode(const cv::Mat &src, cv::Point2f* rect_points, double scale);
+void approxIm(const cv::Mat &src_bin,cv::Mat &dst);
 /// @brief Функция предназначенная для поиска штрихкода на изображении
 /// @param src Исходное изображение
 /// @param rect_points Массив вершин прямоугольного контура
-void findBarcode(cv::Mat src, cv::Point2f* rect_points);
+void findBarcode(const cv::Mat &src, cv::Point2f* rect_points);
 /// @brief Функция нормализирующая штрихкод и находящая битовую последовательность закодированную в штрихкоду
 /// @param src Исходное изображение на которои необходимо произвести нормализацию штрихкода
 /// @param dst Изображение на котором будет отрисован нормализованный штрихкод
@@ -111,11 +111,19 @@ void Normalize_and_read_Barcode(const cv::Mat& src, cv::Mat& dst, cv::Point2f* r
 /// @param vec Вектор содержащий значения ширины штрихов и пробелов штрихкода
 /// @param vecBit Битовая последовательность считанная с штрихкода
 void Normalize_and_read_Barcode_with_Blur(const cv::Mat& src, cv::Mat& dst, cv::Point2f* rect_points, std::vector<int>& vec, std::vector<int>& vecBit);
+void Normalize_Barcode(const cv::Mat& src, cv::Mat& dst, cv::Point2f* rect_points);
+void readBarcode(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
+void readBarcode_withBlur(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
+void readBarcode_withApprox(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
+void readBarcode_triangle(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
+void readBarcode_triangle_withBlur(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
+void readBarcode_triangle_withApprox(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit);
 /// @brief Функция предназначенная для глубокого поиска штрихкода на изображении и считывания битовой последовательности закодированной штрихкодом
 /// @param src Исходное изображение на котором необходимо осуществить поиск штрихкода
 /// @param imgRoi Изображение на котором будет отрисован нормализованный штрихкод
 /// @param rect_points Массив в который будет записанно множество вершин прямоугольника описывающего область в котором находится штрихкод
 /// @param vecBit битовой последовательность закодированная штрихкодом
 void findnScanBarcode(const cv::Mat& src, cv::Mat& imgRoi, cv::Point2f* rect_points, std::vector<int>& vecBit);
-
+void findnScanBarcodeX(const cv::Mat& src, cv::Mat& imgRoi, cv::Point2f* rect_points, std::vector<int>& vec, std::vector<int>& vecBit);
+std::vector<int> claster(std::vector<int> input);
 #endif

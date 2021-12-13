@@ -1,13 +1,13 @@
 #include"barcode_detecting.h"
 
 
-void print(cv::Mat src, std::string window_name)
+void print(const cv::Mat &src, std::string window_name)
 {
 	cv::namedWindow(window_name, cv::WINDOW_NORMAL);//Создаем окно в которм выведем изображение
 	cv::resizeWindow(window_name, 600, 400);// Изменяем стандартный размер окна для удобного восприятия пользователем
 	imshow(window_name, src); //Выводим изображение на экран
 }
-cv::Mat sharp(cv::Mat src)
+cv::Mat sharp(const cv::Mat& src)
 {
 	cv::Mat result;
 	cv::Mat kernel = (cv::Mat_<int>(3, 3) << -1, -1, -1, -1, 9, -1, -1, -1, -1);
@@ -15,7 +15,7 @@ cv::Mat sharp(cv::Mat src)
 	return result;
 }
 
-cv::Mat scaler(cv::Mat& src, double &scale, double modelSize)
+cv::Mat scaler(const cv::Mat& src, double &scale, double modelSize)
 {
 	//Результат работы функции
 	cv::Mat res;
@@ -34,7 +34,7 @@ cv::Mat scaler(cv::Mat& src, double &scale, double modelSize)
 		res = src;//Если изображение уже имеет нужный размер мы ничего не меняем
 	return res;
 }
-void contoursScaler(cv::Mat img, cv::Point2f* rect_points, double scale, double modelSize)
+void contoursScaler(const cv::Mat &img, cv::Point2f* rect_points, double scale, double modelSize)
 {
 	//Сравниваем значения ширины изображения в масштабе на которой мы хотим перенести контур
 	//и изображения в масштабе на котором мы нашли котур
@@ -75,7 +75,7 @@ double lineLenght(cv::Point2f a, cv::Point2f b)
 	return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
 
-cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)//Поворт изображения происходит относительн двух линий: Левого края изображения и отрезка заданного двумя точками
+cv::Mat Rotation(const cv::Mat &img, cv::Point2f a, cv::Point2f b)//Поворт изображения происходит относительн двух линий: Левого края изображения и отрезка заданного двумя точками
 {
 	//Координаты вектора с помощью которого будет производится поворот
 	cv::Point2f vec = b - a;
@@ -105,7 +105,7 @@ cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b)//Поворт изображения 
 	return result;
 }
 
-cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_points)//Поворт изображения происходит относительн двух линий: Левого края изображения и отрезка заданного двумя точками
+cv::Mat Rotation(const cv::Mat &img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_points)//Поворт изображения происходит относительн двух линий: Левого края изображения и отрезка заданного двумя точками
 {
 	//Координаты вектора с помощью которого будет производится поворот
 	cv::Point2f vec = b - a;
@@ -146,7 +146,7 @@ cv::Mat Rotation(cv::Mat img, cv::Point2f a, cv::Point2f b, cv::Point2f* rect_po
 	return result;
 }
 
-cv::Mat Gradient(cv::Mat src_gray)
+cv::Mat Gradient(const cv::Mat &src_gray)
 {
 	// Градиент dx
 	cv::Mat grad_x, 
@@ -171,7 +171,9 @@ cv::Mat Gradient(cv::Mat src_gray)
 	cv::subtract(abs_grad_x, abs_grad_y, grad);
 	
 	cv::convertScaleAbs(grad, grad);
+	
 	cv::threshold(grad, grad, 200, 255, cv::THRESH_OTSU);
+	
 	//Проходим эрозией и дилатицией для очистки изображения от лишней информации
 	cv::erode(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 1);
 	cv::dilate(grad, grad, cv::Mat::ones(1, 1, CV_32F), cv::Point(-1, -1), 2);
@@ -183,7 +185,7 @@ cv::Mat Gradient(cv::Mat src_gray)
 	//print(grad, "Binary");
 	return grad;
 }
-void contours(cv::Mat & grad, cv::Point2f* rect_points) {
+void contours(const cv::Mat & grad, cv::Point2f* rect_points) {
 	cv::Mat blured_bin = grad;
 	std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hireachy;
@@ -332,8 +334,26 @@ std::vector<int> normalizeVecBit(std::vector<int> histB, std::vector<int> histW)
 //	normalizeVec[normalizeVec.size() - 1] = round(histB[histB.size() - 1] / (double)zeroMod);
 	return normalizeVec;
 }
+std::vector<int> normalizeVecBit(std::vector<int> vec) {
+	std::vector<int> normalizeVec;
+	int indx;
+	for (int i = 0; i < vec.size() - 1; i += 2)
+	{
+		indx = vec[i];
+		for (int i = 0; i < indx; i++)
+		{
+			normalizeVec.push_back(1);
+		}
+		indx = vec[i+1];
+		for (int i = 0; i < indx; i++)
+		{
+			normalizeVec.push_back(0);
+		}
+	}
 
-cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec)
+	return normalizeVec;
+}
+cv::Mat drawCode(const cv::Mat& imeg_bin, std::vector<int> normalizeVec)
 {
 	
 	int mat_h, mat_w;
@@ -355,7 +375,7 @@ cv::Mat drawCode(cv::Mat& imeg_bin, std::vector<int> normalizeVec)
 	return barcode;
 }
 
-std::vector<int> decoder(std::vector<int> vecBit)
+std::vector<int> decoder(const std::vector<int>& vecBit)
 {
 	if (check(vecBit) == false)
 	{
@@ -434,7 +454,7 @@ std::vector<int> decoder(std::vector<int> vecBit)
 	result[0] = encodingFirstNumTable.find(firstNum)->second;
 	return result;
 }
-std::string decoderStr(std::vector<int> vecBit)
+std::string decoderStr(const std::vector<int>& vecBit)
 {
 	if (check(vecBit) == false)
 	{
@@ -538,7 +558,7 @@ std::string decoderStr(std::vector<int> vecBit)
 	}
 	return result;
 }
-void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale)
+void findBarcode(const cv::Mat &src, cv::Point2f* rect_points, double scale)
 {
 	cv::Mat img = src;
 	cv::Mat src_gray, src_bin;
@@ -555,7 +575,7 @@ void findBarcode(cv::Mat src, cv::Point2f* rect_points, double scale)
 	
 }
 
-void approxIm(cv::Mat src_bin, cv::Mat &dst)
+void approxIm(const cv::Mat &src_bin, cv::Mat &dst)
 {
 	std::vector<std::vector<cv::Point> > contours;
 	std::vector<cv::Vec4i> hireachy;
@@ -571,7 +591,7 @@ void approxIm(cv::Mat src_bin, cv::Mat &dst)
 	dst = approx;
 }
 
-void findBarcode(cv::Mat src, cv::Point2f* rect_points)
+void findBarcode(const cv::Mat &src, cv::Point2f* rect_points)
 {
 	cv::Mat img = src;
 	cv::Mat src_gray, src_bin;
@@ -658,21 +678,26 @@ void Normalize_and_read_Barcode(const cv::Mat& src,cv::Mat& dst, cv::Point2f * r
 	
 	rotRect = cv::RotatedRect(rot_points[0], rot_points[1], rot_points[2]);
 	roi = rotRect.boundingRect2f();
-	cv::rectangle(rot, roi, cv::Scalar(0, 255, 0), 5);
+	//cv::rectangle(rot, roi, cv::Scalar(0, 255, 0), 5);
 	
 	
 	imgRoi = rot(roi);
 	
 	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
-	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
-
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_TRIANGLE);
+	//print(imgRoi, "ROi_std");
 	
 	
 	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
 	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
-	
+	if (Whist.size() != 0 && Bhist.size()!=0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+		
 	vec = normalizeVec(Bhist, Whist);
-	vecBit = normalizeVecBit(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
 	dst= drawCode(imgRoi, vec);
 }
 void Normalize_and_read_Barcode_with_Blur(const cv::Mat& src, cv::Mat& dst, cv::Point2f* rect_points, std::vector<int>& vec, std::vector<int>& vecBit)
@@ -708,13 +733,18 @@ void Normalize_and_read_Barcode_with_Blur(const cv::Mat& src, cv::Mat& dst, cv::
 	cv::medianBlur(imgRoi, imgRoi, 5);
 	
 	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
-	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
-	
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_TRIANGLE);
+	//print(imgRoi, "ROi_blur");
 	
 	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
 	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
 	vec = normalizeVec(Bhist, Whist);
-	vecBit = normalizeVecBit(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
 	dst = drawCode(imgRoi, vec);
 }
 void Normalize_and_read_Barcode_with_APPROX(const cv::Mat& src, cv::Mat& dst, cv::Point2f* rect_points, std::vector<int>& vec, std::vector<int>& vecBit)
@@ -750,15 +780,163 @@ void Normalize_and_read_Barcode_with_APPROX(const cv::Mat& src, cv::Mat& dst, cv
 	//cv::medianBlur(imgRoi, imgRoi, 5);
 
 	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
-	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+	cv::threshold(imgRoi, imgRoi, 100, 255,  cv::THRESH_TRIANGLE);
 	approxIm(~imgRoi,imgRoi);
-	
+	//print(imgRoi, "ROi_approx");
 	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
 	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
 	vec = normalizeVec(Bhist, Whist);
 	
-	vecBit = normalizeVecBit(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
 	
+	dst = drawCode(imgRoi, vec);
+}
+void Normalize_Barcode(const cv::Mat& src, cv::Mat& dst, cv::Point2f* rect_points)
+{
+	cv::Scalar color = cv::Scalar(0, 255, 0);
+	cv::Point a, b;
+	cv::Mat rot, rotImg;
+	cv::RotatedRect rotRect;
+	cv::Rect roi;
+	cv::Mat imgRoi, imgRoiBin;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::Point2f rot_points[4]{ rect_points[0],rect_points[1],rect_points[2],rect_points[3] };
+	bool stop = false;
+	if (lineLenght(rect_points[0], rect_points[1]) > lineLenght(rect_points[1], rect_points[2]))
+	{
+		a = (rect_points[0] + rect_points[1]) / 2;
+		b = (rect_points[2] + rect_points[3]) / 2;
+	}
+	else {
+		a = (rect_points[1] + rect_points[2]) / 2;
+		b = (rect_points[3] + rect_points[1]) / 2;
+	}
+	if (a.y > b.y)
+	{
+		std::swap(a, b);
+	}
+
+
+	rot = Rotation(src, a, b, rot_points);
+
+	rotRect = cv::RotatedRect(rot_points[0], rot_points[1], rot_points[2]);
+	roi = rotRect.boundingRect2f();
+	//cv::rectangle(rot, roi, cv::Scalar(0, 255, 0), 5);
+	//imgRoi = rot(roi);
+	dst= rot(roi);
+}
+void readBarcode(const cv::Mat& src, cv::Mat& dst,  std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
+	dst = drawCode(imgRoi, vec);
+}
+void readBarcode_withBlur(const cv::Mat& src, cv::Mat& dst,  std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
+	dst = drawCode(imgRoi, vec);
+}
+void readBarcode_withApprox(const cv::Mat& src, cv::Mat& dst,  std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_OTSU);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
+	dst = drawCode(imgRoi, vec);
+}
+void readBarcode_triangle(const cv::Mat& src, cv::Mat& dst,  std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_TRIANGLE);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
+	dst = drawCode(imgRoi, vec);
+}
+void readBarcode_triangle_withBlur(const cv::Mat& src, cv::Mat& dst,  std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_TRIANGLE);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
+	dst = drawCode(imgRoi, vec);
+}
+void readBarcode_triangle_withApprox(const cv::Mat& src, cv::Mat& dst, std::vector<int>& vec, std::vector<int>& vecBit) {
+	cv::Mat imgRoi = src;
+	std::vector<int> Whist;
+	std::vector<int> Bhist;
+	cv::cvtColor(imgRoi, imgRoi, cv::COLOR_BGR2GRAY);
+	cv::threshold(imgRoi, imgRoi, 100, 255, cv::THRESH_TRIANGLE);
+	//print(imgRoi, "ROi_std");
+	Whist = countStrokes(imgRoi, 255, imgRoi.rows / 2);
+	Bhist = countStrokes(imgRoi, 0, imgRoi.rows / 2);
+	if (Whist.size() != 0 && Bhist.size() != 0)
+	{
+		Whist = claster(Whist);
+		Bhist = claster(Bhist);
+	}
+	vec = normalizeVec(Bhist, Whist);
+	vecBit = normalizeVecBit(vec);
 	dst = drawCode(imgRoi, vec);
 }
 void findnScanBarcode(const cv::Mat& src,cv::Mat& imgRoi, cv::Point2f* rect_points, std::vector<int>& vecBit)
@@ -787,5 +965,144 @@ void findnScanBarcode(const cv::Mat& src,cv::Mat& imgRoi, cv::Point2f* rect_poin
 	{
 		Normalize_and_read_Barcode_with_APPROX(src, imgRoi, rect_points, vec, vecBit);
 	}
+}
+void findnScanBarcodeX(const cv::Mat& src, cv::Mat& imgRoi, cv::Point2f* rect_points, std::vector<int>& vec, std::vector<int>& vecBit)
+{
+	cv::Mat tmp;
+	std::vector<int> standartScales = { 600,400,200 };
+	vec.clear();
+	bool stop = false;
+	int flag = 0;
+	while (!stop)
+	{
+		findBarcode(src, rect_points, standartScales[flag]);
+
+		Normalize_Barcode(src, imgRoi, rect_points);
+		readBarcode(imgRoi, tmp, vec, vecBit);
+		++flag;
+		if ((vec.size() == 59) || (flag == standartScales.size()))
+		{
+			stop = true;
+		}
+	}
+	if (vec.size() == 59) {
+		if (check(vecBit) == false)
+		{
+			readBarcode_withBlur(imgRoi, tmp, vec, vecBit);
+		}
+		if (check(vecBit) == false)
+		{
+			readBarcode_withApprox(imgRoi, tmp, vec, vecBit);
+		}
+		if (check(vecBit) == false)
+		{
+			readBarcode_triangle(imgRoi, tmp, vec, vecBit);
+		}
+		if (check(vecBit) == false)
+		{
+			readBarcode_triangle_withBlur(imgRoi, tmp, vec, vecBit);
+		}
+		if (check(vecBit) == false)
+		{
+			readBarcode_triangle_withApprox(imgRoi, tmp, vec, vecBit);
+		}
+		imgRoi = tmp;
+	}
+}
+
+float distance(float a, float b)
+{
+	return abs(a - b);
+}
+
+std::vector<int> claster(std::vector<int> input)
+{
+	int newValue = input[0] * 4;
+	input.push_back(newValue);
+	std::map<int, float> centers;
+	std::vector<int> res;
+	std::vector<int> clasterName;
+	for (int i = 0; i < input.size(); i++)
+	{
+		centers[i] = input[i];
+		clasterName.push_back(i);
+		res.push_back(i);
+	}
+
+	while (clasterName.size() > 4)
+	{
+		float min = 100000;
+		int claster1 = -1;
+		int claster2 = -1;
+		for (int i = 0; i < clasterName.size() - 1; i++)
+		{
+			for (int j = i + 1; j < clasterName.size(); j++)
+			{
+				if (distance(centers[clasterName[i]], centers[clasterName[j]]) < min)
+				{
+					min = distance(centers[clasterName[i]], centers[clasterName[j]]);
+					claster1 = clasterName[i];
+					claster2 = clasterName[j];
+				}
+
+			}
+
+		}
+		for (int i = 0; i < res.size(); i++)
+		{
+			if (res[i] == claster1)
+			{
+				res[i] = claster2;
+			}
+		}
+		std::vector<int>::iterator it;
+		it = std::find(clasterName.begin(), clasterName.end(), claster1);
+		clasterName.erase(it);
+		//centers.erase(centers.find(claster1));
+		float mean = 0;
+		int diff = 0;
+
+		for (int i = 0; i < res.size(); i++)
+		{
+			if (res[i] == claster2)
+			{
+				mean += input[i];
+				diff++;
+			}
+		}
+		mean = mean / diff;
+		centers[claster2] = mean;
+
+
+	}
+	std::vector<std::pair<int, int>> out;
+	for (int i = 0; i < res.size(); i++)
+		out.push_back(std::make_pair(input[i], res[i]));
+
+	std::sort(out.begin(), out.end());
+
+	std::vector < std::pair<int, int>> out_or = out;
+
+	out[0].second = 1;
+	int tmp(1);
+	for (int i = 1; i < out.size(); i++)
+	{
+		if (out_or[i].second != out_or[i - 1].second)
+			tmp += 1;
+		out[i].second = tmp;
+	}
+
+	std::map<int, int> out_map;
+	for (auto i : out) {
+		out_map[i.first] = i.second;
+	}
+
+	std::vector<int> out_vect;
+	for (auto i : input) {
+		out_vect.push_back(out_map[i]);
+	}
+	out_vect.pop_back();
+
+	return out_vect;
 }
 

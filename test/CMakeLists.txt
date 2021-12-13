@@ -25,3 +25,8 @@ add_custom_target(install_${PROJECT_NAME}
         
 file(GLOB MY_FILES "data/*.jpg") 
 file(COPY ${MY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/data)
+make_directory(${CMAKE_CURRENT_BINARY_DIR}/results)
+file(GLOB MY_FILES "results/*.jpg") 
+file(COPY ${MY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/results)
+file(GLOB MY_FILES "results/*.txt") 
+file(COPY ${MY_FILES} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/results)
